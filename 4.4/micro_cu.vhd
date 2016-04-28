@@ -59,7 +59,7 @@ begin
                             uPC <=FUNC&OPCODE;
                     else 
                       CURRENT_STATE <= NEXT_STATE;
-                      uPC <= uPC + "00000000000000011";
+                      uPC <= uPC + "00000000000000001";
                     end if;
                 end process update_state;
                 
