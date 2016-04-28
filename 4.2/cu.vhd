@@ -482,7 +482,15 @@ cu_beh: process(clk)
                                     WM     <='0';                -- disables the write-in of the memory, 
                                     s3     <='1';                -- s3=1, ouput from MEMMORY
                                     WF1   <='1';                -- save the value in RF   
-                                
+                      when others   =>  -- Error: we don't recognize the OPCODE
+                                        EN2    <='0';               -- disables the pipe registers
+                                        --don't save alu output
+                                        -- DISABLE 3rd stage output
+                                        EN3    <='0';               -- disables the memory and the pipeline registers
+                                        RM     <='0';               -- disables the read-out of the memory
+                                        WM     <='0';                -- disables the write-in of the memory
+                                        --DISABLE WRITE ALU_OUTPUT IN RF
+                                        WF1   <='0';                -- disables the write port of the register file, functio is UNKNOWN         
                       end case; --end case of OPCODE
                     end if; --end if reset
           end if; --end if rising edge
