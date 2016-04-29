@@ -82,10 +82,6 @@ begin
         cu_func_i <= RTYPE_ADD;
         wait for 2 ns;
 
-        -- ADDI1 RS1,RD,INP1 -> Itype
-        cu_opcode_i <= ITYPE_ADDI1;
-        cu_func_i <= NOP;
-        wait for 2 ns;
         
         ---> Rtype
         -- SUB RS1,RS2,RD
@@ -179,7 +175,7 @@ begin
         wait;
         end process;
 
-end cu_test;
+end test;
 
 configuration CFG_CU_TEST of cu_test is
    for cu_test

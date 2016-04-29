@@ -125,7 +125,7 @@ cu_beh: process(clk)
                                         s3     <='0';               -- input selection of the third multiplexer
                                                                     --s3=0, select from ALU_OUTPUT
                                         
-                                        when => RTYPE_OR   -- OR RS1,RS2,RD "00000000011"
+                                        when  RTYPE_OR =>  -- OR RS1,RS2,RD "00000000011"
                                         ALU1   <='1';            -- alu control bit
                                         ALU2   <='1';
                                         EN2    <='1';               -- enables the pipe registers
