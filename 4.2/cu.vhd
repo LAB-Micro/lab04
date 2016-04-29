@@ -497,3 +497,8 @@ cu_beh: process(clk)
           end process cu_beh;
   
 end cu_hw;
+
+configuration CFG_cu_HARDWIRED of cu is
+  for cu_hw
+  end for;
+end configuration;

@@ -86,12 +86,105 @@ begin
         cu_opcode_i <= ITYPE_ADDI1;
         cu_func_i <= NOP;
         wait for 2 ns;
-
-        -- .............
-        -- add all the others instructions
-        -- .............
-
+        
+        ---> Rtype
+        -- SUB RS1,RS2,RD
+        cu_func_i <= RTYPE_SUB;
+        wait for 2 ns;
+        ---> Rtype
+        -- AND RS1,RS2,RD
+        cu_func_i <= RTYPE_AND;
+        wait for 2 ns;
+        
+        ---> Rtype
+         -- OR RS1,RS2,RD
+        cu_func_i <= RTYPE_OR;
+        wait for 2 ns;
+        
+        --> Itype
+        -- ADDI1 RS2,RD,INP1
+        cu_opcode_i <= ITYPE_ADDI1;
+        wait for 2 ns;
+        
+        --> Itype
+        -- SUBI1 RS2,RD,INP1
+        cu_opcode_i <= ITYPE_SUBI1;
+        wait for 2 ns;
+        
+        
+        --> Itype
+        -- ANDI1 RS2,RD,INP1
+        cu_opcode_i <= ITYPE_ANDI1;
+        wait for 2 ns;
+        
+        --> Itype
+        --  ORI1 RS2,RD,INP1
+        cu_opcode_i <= ITYPE_ORI1;
+        wait for 2 ns;
+        
+        --> Itype
+        --  ADDI2 RS1,RD,INP2
+        cu_opcode_i <= ITYPE_ADDI2;
+        wait for 2 ns;
+        
+        --> Itype
+        --  SUBI2 RS1,RD,INP2
+        cu_opcode_i <= ITYPE_SUBI2;
+        wait for 2 ns;
+        
+        --> Itype
+        --  ANDI2 RS1,RD,INP2
+        cu_opcode_i <= ITYPE_ANDI2;
+        wait for 2 ns;
+        
+        --> Itype
+        --  ORI2 RS1,RD,INP1
+        cu_opcode_i <= ITYPE_ORI2;
+        wait for 2 ns;
+        
+        
+        --> Itype
+        --   --mov RS1, RD, INP2
+        cu_opcode_i <= MOV ;
+        wait for 2 ns;
+        
+        
+        --> Itype
+        --sav RD, input1. iT BEHAVES LIKE --ADDI1 R0,RD,INP1, r0 is 0
+        cu_opcode_i <= S_REG1;
+        wait for 2 ns;
+        
+        
+        --> Itype
+        --sav RD, input2. it behaves like  --ADDI2 R0,RD,INP2, r0 is 0
+        cu_opcode_i <= S_REG2;
+        wait for 2 ns;
+        
+        --> Itype
+        --MEM[R1+inp2]=r2 
+        cu_opcode_i <= S_MEM2;
+        wait for 2 ns;
+        
+        
+        --> Itype
+        --RD=mem[inp1+r2]
+        cu_opcode_i <= L_MEM1;
+        wait for 2 ns;
+        
+        --> Itype
+        --RD=mem[inp2+r1]
+        cu_opcode_i <= L_MEM2;
+        wait for 2 ns;
+    
         wait;
         end process;
 
 end cu_test;
+
+configuration CFG_CU_TEST of cu_test is
+   for cu_test
+      for dut : cu
+         use configuration WORK.CFG_cu_HARDWIRED; 
+      end for;
+   end for;
+end CFG_CU_TEST;
