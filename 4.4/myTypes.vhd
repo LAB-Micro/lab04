@@ -4,10 +4,10 @@ use ieee.std_logic_1164.all;
 package myTypes is
 
 -- Control unit input sizes
-    constant OP_CODE_SIZE : integer :=  6;       -- OPCODE field size
-    constant FUNC_SIZE    : integer :=  11;      -- FUNC field size
-    
-    
+    constant OP_CODE_SIZE	: integer :=  6;       -- OPCODE field size
+    constant FUNC_SIZE		: integer :=  11;      -- FUNC field size
+	constant N_OUTS		: integer :=  13;      -- NUMBER OF OUTPUTS OF THE CONTROLLER
+	
 -- R-Type instruction -> OPCODE field
     constant RTYPE : std_logic_vector(OP_CODE_SIZE - 1 downto 0) :=  "000000";          -- for ADD, SUB, AND, OR register-to-register operation
 -- R-Type instruction -> FUNC field

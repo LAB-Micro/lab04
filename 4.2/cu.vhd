@@ -430,12 +430,12 @@ cu_beh: process(clk)
                                     ALU1   <='0';            -- alu control bit
                                     ALU2   <='0';
                                     EN2    <='1';               -- enables the pipe registers
+									WF1   <='0';                --we don't need to save the value in RF    
                                     -- THIRD PIPE STAGE OUTPUTS
                                     EN3    <='1';               -- enables the memory and the pipeline registers
                                     RM     <='0';               -- disables the read-out of the memory
                                     WM     <='1';                -- enables the write-in of the memory, SAVE INTO MEMORY
-                                    s3     <='0';  --we don't need it, but we can check the address for the memory
-                                    WF1   <='0';                --we don't need to save the value in RF      
+                                    s3     <='0';  --we don't need it, but we can check the address for the memory  
                                 
                         when L_MEM1 =>
                                     -- FIRST PIPE STAGE OUTPUTS
@@ -453,12 +453,12 @@ cu_beh: process(clk)
                                     ALU1   <='0';            -- alu control bit
                                     ALU2   <='0';
                                     EN2    <='1';               -- enables the pipe registers
+									WF1   <='1';                -- save the value in RF   
                                     -- THIRD PIPE STAGE OUTPUTS
                                     EN3    <='1';               -- enables the memory and the pipeline registers
                                     RM     <='1';               -- enables the read-out of the memory, READ and SAVE INTO RF
                                     WM     <='0';                -- disables the write-in of the memory, 
                                     s3     <='1';                -- s3=1, ouput from MEMMORY
-                                    WF1   <='1';                -- save the value in RF   
 
                         when L_MEM2 =>
                                     -- FIRST PIPE STAGE OUTPUTS
@@ -476,12 +476,13 @@ cu_beh: process(clk)
                                     ALU1   <='0';            -- alu control bit
                                     ALU2   <='0';
                                     EN2    <='1';               -- enables the pipe registers
+									WF1   <='1';                -- save the value in RF   
                                     -- THIRD PIPE STAGE OUTPUTS
                                     EN3    <='1';               -- enables the memory and the pipeline registers
                                     RM     <='1';               -- enables the read-out of the memory, READ and SAVE INTO RF
                                     WM     <='0';                -- disables the write-in of the memory, 
                                     s3     <='1';                -- s3=1, ouput from MEMMORY
-                                    WF1   <='1';                -- save the value in RF   
+									
                       when others   =>  -- Error: we don't recognize the OPCODE
                                         EN2    <='0';               -- disables the pipe registers
                                         --don't save alu output

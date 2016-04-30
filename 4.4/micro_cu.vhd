@@ -1,10 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
-use ieee.std_logic_arith.all;
 use work.myTypes.all;
---use ieee.numeric_std.all;
---use work.all;
 
 entity micro_cu is
   port (
@@ -33,20 +30,140 @@ entity micro_cu is
 end micro_cu;
 
 architecture fsm_cu_beh of micro_cu is
-
-  signal to_stage_2 : std_logic_vector(9 downto 0) := (others=>'0');
-  signal to_stage_3 : std_logic_vector(4 downto 0) := (others=>'0');
+	
+	type micro_memory is array(2**(FUNC_SIZE'length + OP_CODE_SIZE'length)) of std_logic_vector(N_OUTS-1 downto 0); 
+	signal micro_mem : micro_memory := (others => (others => '0'));
+	signal counter : integer := 0;
   
 	type TYPE_STATE is (
-		reset, stage1, stage2, stage3
+		reset, stage123
 	);
 	signal CURRENT_STATE : TYPE_STATE := reset;
-	signal NEXT_STATE : TYPE_STATE := fetch;
+	signal NEXT_STATE : TYPE_STATE;
   
-  signal uPC: std_logic_vector(16 downto 0) := (others =>'0');--uPC=Func&OPCODE.  the total bits are 17
+	signal uPC: std_logic_vector((FUNC_SIZE'length + OP_CODE_SIZE'length - 1) downto 0) := (others =>'0');--uPC=Func&OPCODE.  the total bits are 17
+	
+	
+	--															 PIPELINES
+	--															1st	 2st  3st
+	--								           
+	--															RF1  0	  0
+	--															RF2  0	  0
+	--															EN1  0	  0
+	--															 0	 S1	  0
+	--															 0	 S2	  0
+	--															 0	ALU1  0
+	--															 0	ALU2  0
+	--															 0	EN2	  0
+	--															 0	 0	  RM
+	--															 0	 0	  WM
+	--															 0	 0	  S3
+	--															 0	 0	  EN3
+	--															 0	 0	  WF1
+	--
+	--															 3 +  5 +  5   useful bits
+	--
+	
+	------------------------------------    MICRO MEMORY  -------------------------------------------------
+	
+	--R-Type instruction 
+	-- ADD RS1,RS2,RD				 FUNC	   & OPCODE
+	signal micro_mem(conv_integer("00000000000"&"000000")) := "111"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"000001")) := (2 downto 0 => '0')&"01001"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"000010")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- SUB RS1,RS2,RD
+	signal micro_mem(conv_integer("00000000001"&"000000")) := "111"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000001"&"000001")) := (2 downto 0 => '0')&"01011"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000001"&"000010")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- AND RS1,RS2,RD
+	signal micro_mem(conv_integer("00000000010"&"000000")) := "111"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000010"&"000001")) := (2 downto 0 => '0')&"01101"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000010"&"000010")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- OR RS1,RS2,RD
+	signal micro_mem(conv_integer("00000000011"&"000000")) := "111"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000011"&"000001")) := (2 downto 0 => '0')&"01111"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000011"&"000010")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
 
-
-
+	
+	--I-Type instruction
+	-- ADDI1 RS2,RD,INP1
+	signal micro_mem(conv_integer("00000000000"&"000011")) := "011"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"000100")) := (2 downto 0 => '0')&"11001"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"000101")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	
+	-- SUBI1 RS2,RD,INP1
+	signal micro_mem(conv_integer("00000000000"&"000110")) := "011"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"000111")) := (2 downto 0 => '0')&"11011"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"001000")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- ANDI1 RS2,RD,INP1
+	signal micro_mem(conv_integer("00000000000"&"001001")) := "011"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"001010")) := (2 downto 0 => '0')&"11101"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"001011")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	
+	-- ORI1 RS2,RD,INP1
+	signal micro_mem(conv_integer("00000000000"&"001100")) := "011"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"001101")) := (2 downto 0 => '0')&"11111"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"001110")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	
+	-- ADDI2 RS1,RD,INP2
+	signal micro_mem(conv_integer("00000000000"&"001111")) := "101"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"010000")) := (2 downto 0 => '0')&"00001"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"010001")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- SUBI2 RS1,RD,INP2
+	signal micro_mem(conv_integer("00000000000"&"010101")) := "101"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"010110")) := (2 downto 0 => '0')&"00011"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"010111")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- ANDI2 RS1,RD,INP2
+	signal micro_mem(conv_integer("00000000000"&"011000")) := "101"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"011001")) := (2 downto 0 => '0')&"00101"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"011010")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- ORI2 RS1,RD,INP2
+	signal micro_mem(conv_integer("00000000000"&"011011")) := "101"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"011100")) := (2 downto 0 => '0')&"00111"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"011101")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- mov RS1, RD, INP2	ADDI2 R0,RD,INP2, inp2 is 0
+	signal micro_mem(conv_integer("00000000000"&"011110")) := "101"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"011111")) := (2 downto 0 => '0')&"00001"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"100000")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- sav RD, input1	ADDI1 R0,RD,INP1, r0 is 0
+	signal micro_mem(conv_integer("00000000000"&"100001")) := "011"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"100010")) := (2 downto 0 => '0')&"11001"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"100011")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- sav RD, input2	ADDI2 R0,RD,INP2, r0 is 0
+	signal micro_mem(conv_integer("00000000000"&"100100")) := "101"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"100101")) := (2 downto 0 => '0')&"00001"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"100110")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"00011";
+	
+	-- MEM[R1+inp2]=r2
+	signal micro_mem(conv_integer("00000000000"&"100111")) := "101"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"101000")) := (2 downto 0 => '0')&"00001"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"101001")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"01010";
+	
+	-- RD=mem[inp1+r1]
+	signal micro_mem(conv_integer("00000000000"&"101010")) := "011"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"101011")) := (2 downto 0 => '0')&"11001"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"101100")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"10111";
+	
+	-- tra la istruzione superriore e quella inferiore c'è un gap nell'indice OPCODE.. come mai?? 101100 -> 110000
+	
+	-- RD=mem[inp2+r1]
+	signal micro_mem(conv_integer("00000000000"&"110000")) := "101"&(4 downto 0 => '0')&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"110001")) := (2 downto 0 => '0')&"00001"&(4 downto 0 => '0');
+	signal micro_mem(conv_integer("00000000000"&"110010")) := (2 downto 0 => '0')&(4 downto 0 => '0')&"10111";
+	
  
 begin
 
@@ -57,250 +174,51 @@ begin
                     if Rst='1' then
                             CURRENT_STATE <= reset;
                             uPC <=FUNC&OPCODE;
+							counter <= 0;
                     else 
-                      CURRENT_STATE <= NEXT_STATE;
-                      uPC <= uPC + "00000000000000001";
+						if counter < 3 then
+							CURRENT_STATE <= NEXT_STATE;
+							--uPC <= uPC + "00000000000000001";
+							uPC <= uPC + ((FUNC_SIZE'length + OP_CODE_SIZE'length - 1) downto 0 => '0') & '1';
+							counter <= counter + 1;
+						end if;
                     end if;
                 end process update_state;
                 
-  output_next_state : process(CURRENT_STATE)
+  output_next_state : process(uPC, CURRENT_STATE)
                       begin
                       case CURRENT_STATE is
                           when reset =>
-                          -- FIRST PIPE STAGE OUTPUTS
-                          EN1  <='0';                 -- disables the register file and the pipeline registers
-                          RF1  <='0';                  -- disables the read port 1 of the register file
-                          RF2  <='0';                -- disables the read port 2 of the register file
-                          WF1  <='0';   
-                              
-                          to_stage_2 <=(others=>'0');
-                          NEXT_STATE <= stage1;
+							  -- FIRST PIPE STAGE OUTPUTS
+								EN1		<='0';					-- disables the register file and the pipeline registers
+								RF1		<='0';					-- disables the read port 1 of the register file
+								RF2		<='0';					-- disables the read port 2 of the register file
+								WF1		<='0';   				-- disables the write port of the register file
+								EN2		<='0';					-- disables the pipe registers
+								EN3		<='0';					-- disables the memory and the pipeline registers
+								RM		<='0';					-- disables the read-out of the memory
+								WM		<='0';					-- disables the write-in of the memory
                           
-                          when stage1 =>
-                                --check OPCODE (lower part of the uPC)
-                                case uPC(5 downto 0) is 
-                                when  RTYPE  =>--R-Type
-                                
-                              -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='1';                -- enables the read port 1 of the register file
-                                    RF2   <='1';                -- enables the read port 2 of the register file
-                                    
-                              
-                                    --check FUNCTION signal (upper part of uPC) for ALU signal                            
-                                     case uPC(16 downto 6) is
-                                        when RTYPE_ADD =>  -- ADD "00000000000"
-                                        to_stage_2<="0100100101";
-                                        --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                       
-                                        
-                                        when RTYPE_SUB =>    -- SUB RS1,RS2,RD "00000000001"
-                                        to_stage_2<="0101100101";
-                                        --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                       
-                                      
-                                        
-                                        when RTYPE_AND=>    -- AND RS1,RS2,RD "00000000010"
-                                        to_stage_2<="0101000101";
-                                        --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                       
-                                        
-                                        when => RTYPE_OR   -- OR RS1,RS2,RD "00000000011"
-                                        to_stage_2<="0111100101";
-                                        --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                       
-                                        
-                                        when others   =>  -- Error: we don't recognize the function
-                                        to_stage_2<="0000000000";
-                                        --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                       -- function is UNKNOWN
-                                     end case;
-                                
-                                when ITYPE_ADDI1 =>
-                                    
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='0';                -- disables the read port 1, WE have INPU1
-                                    RF2   <='1';                -- enables the read port 2 of the register file
-                                    
-                                    to_stage_2 <="1100100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                when ITYPE_SUBI1 =>
-                                -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='0';                -- disables the read port 1, WE have INPU1
-                                    RF2   <='1';                -- enables the read port 2 of the register file
-                                    
-                                    to_stage_2 <="1101100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                when ITYPE_ANDI1 =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='0';                -- disables the read port 1, WE have INPU1
-                                    RF2   <='1';                -- enables the read port 2 of the register file
-                                    
-                                    to_stage_2 <="1110100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                  
-                              when ITYPE_ORI1 =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='0';                -- disables the read port 1, WE have INPU1
-                                    RF2   <='1';                -- enables the read port 2 of the register file
-                                    
-                                    to_stage_2 <="1111100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                                                     
-                                when ITYPE_ADDI2 =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='1';                -- enables the read port 1
-                                    RF2   <='0';                -- disables the read port 2, WE have INPUT2
-                                    
-                                    to_stage_2 <="0000100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                                                    
-                                when ITYPE_SUBI2 =>
-                                -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='1';                -- enables the read port 1
-                                    RF2   <='0';                -- disables the read port 2, WE have INPUT2
-                                    
-                                    to_stage_2 <="0001100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                
-                                when ITYPE_ANDI2 =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='1';                -- enables the read port 1
-                                    RF2   <='0';                -- disables the read port 2, WE have INPUT2
-                                    to_stage_2 <="0010100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                              when ITYPE_ORI2 =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='1';                -- enables the read port 1
-                                    RF2   <='0';                -- disables the read port 2, WE have INPUT2
-                                    
-                                    to_stage_2 <="0011100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                              when MOV =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='1';                -- enables the read port 1
-                                    RF2   <='0';                -- disables the read port 2, WE have INPUT2, immediate='0'
-                                    
-                                    to_stage_2 <="0000100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                    
-                                         
-                              when S_REG1 =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='0';                -- disables the read port 1
-                                    RF2   <='1';                -- enables the read port 2, should read r0
-                                    
-                                    to_stage_2 <="1100100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                    
-                                    
-                              when S_REG2 =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='1';                -- enables the read port 1, should read r0
-                                    RF2   <='0';                -- disables the read port 2
-                                    
-                                    to_stage_2 <="0000100101";
-                                    --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                    
-                                         
-                          when S_MEM2 =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='1';                -- enables the read port 1
-                                    RF2   <='0';                -- disables the read port 2, WE have INPUT2
-                                    
-                                    to_stage_2 <="0000101100";
-                                   --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf      
-                                
-                        when L_MEM1 =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='0';                -- disables the read port 1, WE have INPU1
-                                    RF2   <='1';                -- enables the read port 2 of the register file
-                                    
-                                    to_stage_2 <="1100110111";
-                                   --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                    
-                        when L_MEM2 =>
-                                    -- FIRST PIPE STAGE OUTPUTS
-                                    EN1   <='1';                -- enables the register file and the pipeline registers
-                                    RF1   <='1';                -- enables the read port 1,
-                                    RF2   <='0';                -- disenables the read port 2, we have INP2
-                                    
-                                    to_stage_2 <="0000110111";
-                                   --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                    
-                        when others   =>  -- Error: we don't recognize the OPCODE
-                                        to_stage_2<="0000000000";
-                                        --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                                        -- OPCODE is UNKNOWN        
-                      end case; --end case of OPCODE
-                      NEXT_STATE <= stage2;
-                      --disable the signals for stage2 and stage3
-                      s1 <='0';
-                      s2 <='0';
-                      alu1 <='0';
-                      alu2 <='0';
-                      en2 <='0';
-                      rm <='0';
-                      wm <='0';
-                      en3 <='0';
-                      s3 <='0';
-                      wf <='0';
-                      when stage2=>
-                      --disable the signals for stage1
-                      EN1   <='0';                
-                      RF1   <='0';                
-                      RF2   <='0';
-                      
-                      --enable signals for stage2
-                      --s1,s2,alu1,alu2,en2,rm,wm,en3,s3,wf
-                      s1 <=to_stage_2(9);
-                      s2 <=to_stage_2(8);
-                      alu1 <=to_stage_2(7);
-                      alu2 <=to_stage_2(6);
-                      en2 <=to_stage_2(5);
-                      to_stage_3 <=to_stage_2(4 downto 0);
-                      
-                      --disables signals for stage3
-                      rm <='0';
-                      wm <='0';
-                      en3 <='0';
-                      s3 <='0';
-                      wf <='0';
-                      NEXT_STATE <= stage3;
-                      when stage3=>
-                      --disable the signals for stage1
-                      EN1   <='0';                
-                      RF1   <='0';                
-                      RF2   <='0';
-                      
-                      --disables signals for stage2
-                      s1 <='0';
-                      s2 <='0';
-                      alu1 <='0';
-                      alu2 <='0';
-                      en2 <='0';
-                      
-                      --enable the signal for stage3
-                      --rm,wm,en3,s3,wf
-                      rm <=to_stage_3(4);
-                      wm <=to_stage_3(3);
-                      en3 <=to_stage_3(2);
-                      s3 <=to_stage_3(1);
-                      wf <=to_stage_3(0);
-                      NEXT_STATE <= stage1;
+								NEXT_STATE <= stage123;
+                          
+                          when stage123 =>
+								-- FIRST PIPE STAGE OUTPUTS
+								RF1    <= micro_memory(conv_integer(uPC))(0);   -- enables the read port 1 of the register file
+								RF2    <= micro_memory(conv_integer(uPC))(1);   -- enables the read port 2 of the register file
+								EN1    <= micro_memory(conv_integer(uPC))(2);   -- enables the register file and the pipeline registers
+								-- SECOND PIPE STAGE OUTPUTS
+								S1     <= micro_memory(conv_integer(uPC))(3);   -- input selection of the first multiplexer
+								S2     <= micro_memory(conv_integer(uPC))(4);   -- input selection of the second multiplexer
+								ALU1   <= micro_memory(conv_integer(uPC))(5);   -- alu control bit
+								ALU2   <= micro_memory(conv_integer(uPC))(6);   -- alu control bit
+								EN2    <= micro_memory(conv_integer(uPC))(7);   -- enables the pipe registers
+								-- THIRD PIPE STAGE OUTPUTS
+								RM     <= micro_memory(conv_integer(uPC))(8);   -- enables the read-out of the memory
+								WM     <= micro_memory(conv_integer(uPC))(9);   -- enables the write-in of the memory
+								S3     <= micro_memory(conv_integer(uPC))(10);   -- input selection of the multiplexer
+								EN3    <= micro_memory(conv_integer(uPC))(11);   -- enables the memory and the pipeline registers
+								WF1    <= micro_memory(conv_integer(uPC))(12);   -- enables the write port of the register file
+
                       end case; --end case of current state                  
                       
                       end process;
