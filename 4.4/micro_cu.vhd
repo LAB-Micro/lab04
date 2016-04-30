@@ -64,6 +64,7 @@ architecture fsm_cu_beh of micro_cu is
 	--															 3 +  5 +  5   useful bits
 	--
 	
+	
 	------------------------------------    MICRO MEMORY  -------------------------------------------------
 	
 	--R-Type instruction 
